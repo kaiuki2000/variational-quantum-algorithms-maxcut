@@ -1,0 +1,7 @@
+pennylane
+networkx
+matplotlib
+ipykernel
+cvxpy
+scikit-learn
+scipy

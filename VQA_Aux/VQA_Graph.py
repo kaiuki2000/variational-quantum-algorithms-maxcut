@@ -20,7 +20,7 @@ class RXX(Operation):
     par_domain = "R"
 
     grad_method = "A"
-    grad_recipe = None # This is the default but we write it down explicitly here.
+    grad_recipe = None # This is the default, but we write it down explicitly here.
 
     generator = [(qml.PauliX(0) @ qml.PauliX(1)).matrix, -0.5]
 
@@ -44,7 +44,7 @@ class RXX(Operation):
 
     def adjoint(self):
         return RXX(-self.data[0], wires=self.wires)
-    
+
 class VQA_Graph:
     """
     This class implements the VQA_Graph class, which is used to solve the MaxCut problem.

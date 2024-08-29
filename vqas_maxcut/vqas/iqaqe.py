@@ -3,17 +3,50 @@ from vqas_maxcut.vqa_graph import vqa_graph
 from vqas_maxcut.utils import compute_nodes_probs
 
 import pennylane as qml
-import math
 from pennylane import numpy as np
 import matplotlib.pyplot as plt
 import time
 
-# VQA implementations:
+# Interpolated QAOA/QEMC (iQAQE) algorithm for the MaxCut problem
 def iqaqe(vqa_graph_instance: vqa_graph, n_layers = None, shots = None,  device = 'default.qubit',
           basis_states_lists = None, rs = None, non_deterministic_CNOT = False, B = None,
           max_iter = 100, rel_tol = 0, abs_tol = 0, parameters = None, seed = None,
           draw_circuit = False, draw_cost_plot = False, draw_probs_plot = False, draw_nodes_probs_plot = True,
           MaxCut = None, step_size = 0.99, **kwargs):
+    """
+    Implements the iQAQE algorithm for the MaxCut problem.
+
+    **Args:**
+        vqa_graph_instance (vqa_graph): The VQA graph instance.
+        n_layers (int): The number of layers.
+        shots (int): The number of shots.
+        device (str): The device to use.
+        basis_states_lists (list[list]): List of lists of basis states assigned to each graph node.
+        rs (list): List of 'rs' values.
+        non_deterministic_CNOT (bool): Whether to use non-deterministic CNOT gates.
+        B (int): The value of 'B'.
+        max_iter (int): The maximum number of iterations.
+        rel_tol (float): The relative tolerance.
+        abs_tol (float): The absolute tolerance.
+        parameters (array): The parameters.
+        seed (int): The seed.
+        draw_circuit (bool): Whether to draw the circuit.
+        draw_cost_plot (bool): Whether to draw the cost plot.
+        draw_probs_plot (bool): Whether to draw the probabilities plot.
+        draw_nodes_probs_plot (bool): Whether to draw the nodes probabilities plot.
+        MaxCut (int): The maximum cut value.
+        step_size (float): The step size.
+
+    **Returns:**
+        array: The probabilities.
+        list: The nodes probabilities.
+        float: The cost.
+        list: The cost vector.
+        list: The approximation ratio vector.
+        array: The parameters.
+        list: The partition.
+        float: The training time.
+    """
     
     assert(n_layers is not None and basis_states_lists is not None), "n_layers and basis_states_lists cannot be None."
     assert(len(basis_states_lists) == vqa_graph_instance.n_nodes), "The number of basis states lists must be equal to the graph's number of nodes."
@@ -177,3 +210,40 @@ def iqaqe(vqa_graph_instance: vqa_graph, n_layers = None, shots = None,  device 
         print('[Info.] Nodes probabilities plot saved to:', f'iqaqe_nodes_probs_n{n_qubits}_p{n_layers}.png')
 
     return probabilities, nodes_probs, cost, cost_vec, ar_vec, parameters, partition, train_time
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+# Multi-angle QAOA (ma-QAOA) for the MaxCut problem, using the iQAQE Framework
+def ma_qaoa_iqaqe(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 'default.qubit',
+                 diff_Rx = False, B = None, basis_states_lists = None, 
+                 max_iter = 100, rel_tol = 0, abs_tol = 0, parameters = None, seed = None,
+                 draw_circuit = False, draw_cost_plot = False, draw_probs_plot = True,
+                 MaxCut = None, step_size = 0.99, **kwargs):
+    """
+    Implements the ma-QAOA algorithm for the MaxCut problem, using the iQAQE framework.
+    Note: This was removed from the main code, as it proved to be useless. Kept here for reference.
+          The reason for that has to do with how the cost function would be constant, due to the
+          specific 'bsl' that is used.
+    Explanation: the ma-QAOA ansatz generates symmetric states, which results in a constant cost.
+          Example: |\psi> = a|00> + b|01> + b|10> + a|11>, such that |a|^2 + |b|^2 = 1/2. (Normalization.)
+          Then, P(Node 0) = P(|10>) + P(|11>) = 1/2. (Constant cost.)
+          And, P(Node 1) = P(|01>) + P(|11>) = 1/2. (Constant cost.)
+    Previous implementation: 'MA_QAOA_iQAQE_MaxCut' in 'VQA_Graph.py', in the 'HQCC_Beta' GitHub Repository.
+    """
+    pass
+                

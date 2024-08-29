@@ -6,7 +6,8 @@ from pennylane import numpy as np
 import matplotlib.pyplot as plt
 import time
 import math
-import networkx as nx
+import cvxpy as cp
+from scipy.linalg import sqrtm
 
 # Quantum Approximate Optimization Algorithm (QAOA)
 def qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 'default.qubit',
@@ -204,6 +205,11 @@ def qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
 
 
 
+
+
+
+
+
 # Qubit Efficient Max-Cut (QEMC) Algorithm
 def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 'default.qubit',
         rs = None, non_deterministic_CNOT = False, B = None,
@@ -241,7 +247,6 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
         str: Most likely partition.
         float: Time taken for training.
     """
-    
     assert(n_layers is not None and B is not None), "n_layers and B cannot be None."
 
     # Define the number of qubits
@@ -398,6 +403,11 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
 
 
 
+
+
+
+
+
 # Multi-angle Quantum Approximate Optimization Algorithm (ma-QAOA)
 def ma_qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 'default.qubit',
             max_iter = 100, rel_tol = 0, abs_tol = 0, parameters = None, seed = None,
@@ -406,6 +416,11 @@ def ma_qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device
             diff_Rx = False):
     """
     This function implements the Multi-angle Quantum Approximate Optimization Algorithm (ma-QAOA) for the MaxCut problem.
+    Note: There's a slightly different implementation - 'MA_QAOA_MaxCut' in 'VQA_Graph.py', in the 'HQCC_Beta' GitHub Repository.
+          This other implementation considers the possibility of using an expectation value-based cost function.
+          However, due to how it is defined, it yields a constant cost all the time, hindering training (Explained in 'MA_QAOA.ipynb', in the same Repository).
+          If, for any reason, you want to use that implementation, you can find it in the 'VQA_Graph.py' file.
+          That specific part of the code has been removed from this implementation, due to the aforementioned issue.
 
     **Args:**
         vqa_graph_instance (vqa_graph): An instance of the vqa_graph class.
@@ -583,3 +598,69 @@ def ma_qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device
         print('[Info.] Probabilities plot saved to:', f'ma_qaoa_probs_n{n_qubits}_p{n_layers}.png')
 
     return probabilities, cost, cost_vec, ar_vec, parameters, partition, train_time
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def Goemans_Williamson(self, MaxCut = None):
+    """
+    This function implements the Goemans-Williamson algorithm for the MaxCut problem.
+    (Uses a semi-definite programming relaxation.)
+
+    **Args:**
+        MaxCut (int): Maximum cut value for the graph.
+
+    **Returns:**
+        array: Partition of the nodes.
+        float: Cut value.
+        float: Approximation ratio.
+        float: Time taken for running.
+    """
+    # Definitions:
+    n = self.n_nodes; edges = self.graph
+
+    # Semi-definite programming relaxation + Constraints
+    X = cp.Variable((n, n), symmetric=True)
+    constraints = [X >> 0]
+    constraints += [X[i, i] == 1 for i in range(n)]
+
+    # Objective function and solving
+    objective = sum(0.5 * (1 - X[i, j]) for (i, j) in edges)
+    prob = cp.Problem(cp.Maximize(objective), constraints)
+
+    # Solve the problem
+    start_time = time.time()
+    prob.solve()
+    run_time = time.time() - start_time # Time taken for running
+    print("--- Goemans-Williamson algorithm took %s seconds to run. ---" % (run_time))
+
+    # Retrieve x, and random-plane projection - to obtain the sign.
+    x = sqrtm(X.value)
+    u = np.random.randn(n)
+    partition = np.sign(x @ u)
+
+    # Compute the cut value
+    cut = self.compute_cut(partition)
+
+    # Get the approximation ratio, if 'MaxCut' is given
+    if (MaxCut is not None):
+        approx_ratio = cut/MaxCut
+    else:
+        approx_ratio = None
+        
+    # Return the partition
+    return partition, cut, approx_ratio, run_time

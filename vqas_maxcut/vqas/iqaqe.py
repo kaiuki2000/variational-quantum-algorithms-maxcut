@@ -34,6 +34,10 @@ def iqaqe(vqa_graph_instance: vqa_graph, n_layers = None, shots = None,  device 
     
     # Default 'rs' values
     if rs is None: rs = [i % (n_qubits-1) + 1 for i in range(n_layers)]
+
+    # Status messages
+    print(f"[Info.] rs values: {rs}.")
+    print(f"[Info.] B value: {B}.")
     
     # Device setup
     dev = qml.device(device, wires = n_qubits, shots = shots)
@@ -78,7 +82,7 @@ def iqaqe(vqa_graph_instance: vqa_graph, n_layers = None, shots = None,  device 
             float: The value of the cost function.
         """
         probs = circuit(params); cost  = 0
-        nodes_probs = compute_nodes_probs(probs, basis_states_lists)
+        nodes_probs = compute_nodes_probs(probs, basis_states_lists, **kwargs)
         for edge in vqa_graph_instance.graph:
             # j and k are the nodes connected by the edge
             # 0: j, 1: k

@@ -218,7 +218,7 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
         n_layers (int): Number of layers (p) in the QEMC circuit.
         shots (int): Number of shots for the quantum device.
         device (str): Name of the device to use.
-        rs (list): List of integers, where each integer represents the distance between the qubits in the CNOT gate.
+        rs (list): List of integers, where each integer represents the distance between the qubits in the CNOT gate. One integer per layer.
         non_deterministic_CNOT (bool): Flag to use non-deterministic CNOT gates.
         B (int): Parameter for the QEMC algorithm.
         max_iter (int): Maximum number of iterations for the optimization.
@@ -259,6 +259,9 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
 
     # Default 'rs' values
     if(rs is None): rs = [i % (n_qubits-1) + 1 for i in range(n_layers)]
+
+    # Status messages
+    print(f"[Info.] rs values: {rs}.")
     
     # Device setup
     dev = qml.device(device, wires = n_qubits, shots = shots)
@@ -398,7 +401,7 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
 # Multi-angle Quantum Approximate Optimization Algorithm (ma-QAOA)
 def ma_qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 'default.qubit',
             max_iter = 100, rel_tol = 0, abs_tol = 0, parameters = None, seed = None,
-            draw_circuit = False, draw_cost_plot = True, draw_probs_plot = True,
+            draw_circuit = False, draw_cost_plot = False, draw_probs_plot = True,
             MaxCut = None, step_size = 0.99,
             diff_Rx = False):
     """

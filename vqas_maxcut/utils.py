@@ -1,9 +1,12 @@
-def compute_nodes_probs(probabilities, basis_states_lists):
+# Description: This file contains utility functions used in the 'variational-quantum-algorithms-maxcut' project.
+def compute_nodes_probs(probabilities, basis_states_lists, **kwargs):
     """
     Computes the probabilities associated with each node.
+
     **Args:**
         probabilities (list): The probabilities of each basis state.
         basis_states_lists (list[list]): List of lists of basis states assigned to each graph node.
+
     **Returns:**
         list: The probabilities associated with each node.
     """

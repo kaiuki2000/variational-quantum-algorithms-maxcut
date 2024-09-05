@@ -202,3 +202,6 @@ if __name__ == "__main__":
     print("[Info.] The 'smpi' results have been read from 'smpi_32-node_graph_k3_r10_results_finite_shots.npy'.")
     print("[Info.] The 'smpi' results are:")
     print(f"smpi_results: {smpi_results}."); print()
+
+# Curiously, the 'finite shot noise' makes it so we can utilize 'Expectation' cost-type for the 'Parity' ansatz,
+# as the expectation values of the Pauli-Z strings are no longer 0. (Which they are, analytically.)

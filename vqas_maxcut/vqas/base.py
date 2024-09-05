@@ -1,17 +1,10 @@
 import sys; sys.path.append("../..") # Adds higher, higher directory to python modules path.
-from vqas_maxcut.vqa_graph import vqa_graph
 
-import pennylane as qml
-from pennylane import numpy as np
-import matplotlib.pyplot as plt
-import time
-import math
-import cvxpy as cp
-from scipy.linalg import sqrtm
+from vqas_maxcut.vqa_graph import *
 
 # Quantum Approximate Optimization Algorithm (QAOA)
 def qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 'default.qubit',
-        max_iter = 100, rel_tol = 0, abs_tol = 0, parameters = None, seed = None,
+        max_iter = 100, rel_tol = 0, abs_tol = 0, consecutive_count = 5, parameters = None, seed = None,
         draw_circuit = False, draw_cost_plot = False, draw_probs_plot = True,
         MaxCut = None, step_size = 0.99):
     """
@@ -25,6 +18,7 @@ def qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
         max_iter (int): Maximum number of iterations for the optimization.
         rel_tol (float): Relative tolerance for the optimization.
         abs_tol (float): Absolute tolerance for the optimization.
+        consecutive_count (int): Number of consecutive iterations with the same cost function value, to stop the optimization.
         parameters (array): Array of parameters for the QAOA circuit.
         seed (int): Seed for the random number generator.
         draw_circuit (bool): Flag to draw the QAOA circuit.
@@ -122,6 +116,9 @@ def qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
     start_time = time.time(); i, cost_vec, ar_vec = 0, [], [] # For timing
     print("Optimizing parameters...", end='\r')
 
+    # Auxiliary variables for convergence criteria
+    count = consecutive_count
+
     while(True):
         parameters, cost = opt.step_and_cost(objective, parameters); i += 1; cost_vec.append(cost)
         # Compute the approximation ratio, from the computed partition's cut
@@ -132,23 +129,31 @@ def qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
             cut           = vqa_graph_instance.compute_cut(partition)
             approx_ratio  = cut/MaxCut
             ar_vec.append(approx_ratio)
+            
         if(i % 5 == 0):
             print(f"Optimizing parameters... Objective after step {i:4d}: {cost:.7f}", end='\r')
         
-        # Check convergence criteria
+        # Check convergence criteria - absolute tolerance
         if abs_tol != 0 and i >= 2:
             abs_diff = np.abs(cost_vec[i - 1] - cost_vec[i - 2])
             if abs_diff <= abs_tol:
-                print()
-                print(f"Convergence criteria reached: abs_tol <= {abs_tol}")
-                break
+                count += 1
+                if count == 5:
+                    print(); print(f"Convergence criteria reached: abs_tol <= {abs_tol} (For {count} consecutive iterations; At i = {i}.)")
+                    break
+            else:
+                count = 0
 
+        # Check convergence criteria - relative tolerance
         if rel_tol != 0 and i >= 2:
             rel_diff = np.abs(cost_vec[i - 1] - cost_vec[i - 2]) / np.abs(cost_vec[i - 2])
             if rel_diff <= rel_tol:
-                print()
-                print(f"Convergence criteria reached: rel_tol <= {rel_tol}")
-                break
+                count += 1
+                if count == 5:
+                    print(); print(f"Convergence criteria reached: rel_tol <= {rel_tol} (For {count} consecutive iterations; At i = {i}.)")
+                    break
+            else:
+                count = 0
 
         if(i == max_iter):
             print(); print(f"Maximum number of iterations reached: max_iter = {max_iter}")
@@ -213,7 +218,7 @@ def qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
 # Qubit Efficient Max-Cut (QEMC) Algorithm
 def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 'default.qubit',
         rs = None, non_deterministic_CNOT = False, B = None,
-        max_iter = 100, rel_tol = 0, abs_tol = 0, parameters = None, seed = None,
+        max_iter = 100, rel_tol = 0, abs_tol = 0, consecutive_count = 5, parameters = None, seed = None,
         draw_circuit = False, draw_cost_plot = False, draw_nodes_probs_plot = True,
         MaxCut = None, step_size = 0.99):
     """
@@ -230,6 +235,7 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
         max_iter (int): Maximum number of iterations for the optimization.
         rel_tol (float): Relative tolerance for the optimization.
         abs_tol (float): Absolute tolerance for the optimization.
+        consecutive_count (int): Number of consecutive iterations with the same cost function value, to stop the optimization.
         parameters (array): Array of parameters for the QEMC circuit.
         seed (int): Seed for the random number generator.
         draw_circuit (bool): Flag to draw the QEMC circuit.
@@ -247,8 +253,8 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
         str: Most likely partition.
         float: Time taken for training.
     """
-    assert(n_layers is not None and B is not None), "n_layers and B cannot be None."
-
+    assert(n_layers is not None), "n_layers cannot be None."
+    
     # Define the number of qubits
     n_qubits = math.ceil(np.log2(vqa_graph_instance.n_nodes))
 
@@ -262,11 +268,15 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
         assert(parameters.shape == (n_layers, n_qubits, 4) if non_deterministic_CNOT == True else (n_layers, n_qubits, 3)), "parameters has the wrong shape."
     if(non_deterministic_CNOT): print("[Info.] Using non-deterministic CNOT gates. [RX-paramaterized.]") # Status message
 
+    if(B is None):
+        B = vqa_graph_instance.n_nodes//2 # Default value for B
+    
     # Default 'rs' values
     if(rs is None): rs = [i % (n_qubits-1) + 1 for i in range(n_layers)]
 
     # Status messages
     print(f"[Info.] rs values: {rs}.")
+    print(f"[Info.] B value: {B}.")
     
     # Device setup
     dev = qml.device(device, wires = n_qubits, shots = shots)
@@ -324,6 +334,9 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
     start_time = time.time(); i, cost_vec, ar_vec = 0, [], [] # For timing
     print("Optimizing parameters...", end = '\r')
 
+    # Auxiliary variables for convergence criteria
+    count = consecutive_count
+
     while(True):
         parameters, cost = opt.step_and_cost(objective, parameters); i += 1; cost_vec.append(cost)
         # Compute the approximation ratio, from the computed partition's cut
@@ -332,21 +345,31 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
             probabilities = circuit(parameters)
             partition = ['0' if probability < 1 / (2*B) else '1' for probability in probabilities]
             cut = vqa_graph_instance.compute_cut(partition); approx_ratio = cut/MaxCut; ar_vec.append(approx_ratio)
+        
         if i % 5 == 0:
             print(f"Optimizing parameters... Objective after step {i:4d}: {cost:.7f}", end = '\r')
         
-        # Check convergence criteria
+        # Check convergence criteria - absolute tolerance
         if abs_tol != 0 and i >= 2:
             abs_diff = np.abs(cost_vec[i - 1] - cost_vec[i - 2])
             if abs_diff <= abs_tol:
-                print(); print(f"Convergence criteria reached: abs_tol <= {abs_tol}")
-                break
+                count += 1
+                if count == 5:
+                    print(); print(f"Convergence criteria reached: abs_tol <= {abs_tol} (For {count} consecutive iterations; At i = {i}.)")
+                    break
+            else:
+                count = 0
 
+        # Check convergence criteria - relative tolerance
         if rel_tol != 0 and i >= 2:
             rel_diff = np.abs(cost_vec[i - 1] - cost_vec[i - 2]) / np.abs(cost_vec[i - 2])
             if rel_diff <= rel_tol:
-                print(); print(f"Convergence criteria reached: rel_tol <= {rel_tol}")
-                break
+                count += 1
+                if count == 5:
+                    print(); print(f"Convergence criteria reached: rel_tol <= {rel_tol} (For {count} consecutive iterations; At i = {i}.)")
+                    break
+            else:
+                count = 0
 
         # Check maximum iterations
         if i == max_iter:
@@ -410,7 +433,7 @@ def qemc(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 
 
 # Multi-angle Quantum Approximate Optimization Algorithm (ma-QAOA)
 def ma_qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device = 'default.qubit',
-            max_iter = 100, rel_tol = 0, abs_tol = 0, parameters = None, seed = None,
+            max_iter = 100, rel_tol = 0, abs_tol = 0, consecutive_count = 5, parameters = None, seed = None,
             draw_circuit = False, draw_cost_plot = False, draw_probs_plot = True,
             MaxCut = None, step_size = 0.99,
             diff_Rx = False):
@@ -430,6 +453,7 @@ def ma_qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device
         max_iter (int): Maximum number of iterations for the optimization.
         rel_tol (float): Relative tolerance for the optimization.
         abs_tol (float): Absolute tolerance for the optimization.
+        consecutive_count (int): Number of consecutive iterations with the same cost function value, to stop the optimization.
         parameters (array): Array of parameters for the ma-QAOA circuit.
         seed (int): Seed for the random number generator.
         draw_circuit (bool): Flag to draw the ma-QAOA circuit.
@@ -530,6 +554,9 @@ def ma_qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device
     start_time = time.time(); i, cost_vec, ar_vec = 0, [], [] # For timing
     print("Optimizing parameters...", end='\r')
 
+    # Auxiliary variables for convergence criteria
+    count = consecutive_count
+
     while(True):
         parameters, cost = opt.step_and_cost(objective, parameters); i += 1; cost_vec.append(cost)
         # Compute the approximation ratio, from the computed partition's cut
@@ -538,23 +565,31 @@ def ma_qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device
             probabilities = circuit(parameters[:-vqa_graph_instance.n_nodes], parameters[-vqa_graph_instance.n_nodes:], probs_flag = True) if diff_Rx else circuit(parameters[:-1], parameters[-1:], probs_flag = True)
             partition     = format(np.argmax(probabilities), "0"+str(n_qubits)+"b")
             cut           = vqa_graph_instance.compute_cut(partition); approx_ratio = cut/MaxCut; ar_vec.append(approx_ratio)
+        
         if i % 5 == 0:
             print(f"Optimizing parameters... Objective after step {i:4d}: {cost:.7f}", end='\r')
         
-        # Check convergence criteria
+        # Check convergence criteria - absolute tolerance
         if abs_tol != 0 and i >= 2:
             abs_diff = np.abs(cost_vec[i - 1] - cost_vec[i - 2])
             if abs_diff <= abs_tol:
-                print()
-                print(f"Convergence criteria reached: abs_tol <= {abs_tol}")
-                break
+                count += 1
+                if count == 5:
+                    print(); print(f"Convergence criteria reached: abs_tol <= {abs_tol} (For {count} consecutive iterations; At i = {i}.)")
+                    break
+            else:
+                count = 0
 
+        # Check convergence criteria - relative tolerance
         if rel_tol != 0 and i >= 2:
             rel_diff = np.abs(cost_vec[i - 1] - cost_vec[i - 2]) / np.abs(cost_vec[i - 2])
             if rel_diff <= rel_tol:
-                print()
-                print(f"Convergence criteria reached: rel_tol <= {rel_tol}")
-                break
+                count += 1
+                if count == 5:
+                    print(); print(f"Convergence criteria reached: rel_tol <= {rel_tol} (For {count} consecutive iterations; At i = {i}.)")
+                    break
+            else:
+                count = 0
 
         # Check maximum iterations
         if i == max_iter:
@@ -616,7 +651,7 @@ def ma_qaoa(vqa_graph_instance: vqa_graph, n_layers = None, shots = None, device
 
 
 
-def Goemans_Williamson(self, MaxCut = None):
+def goemans_williamson(vqa_graph_instance: vqa_graph, MaxCut = None):
     """
     This function implements the Goemans-Williamson algorithm for the MaxCut problem.
     (Uses a semi-definite programming relaxation.)
@@ -631,7 +666,7 @@ def Goemans_Williamson(self, MaxCut = None):
         float: Time taken for running.
     """
     # Definitions:
-    n = self.n_nodes; edges = self.graph
+    n = vqa_graph_instance.n_nodes; edges = vqa_graph_instance.graph
 
     # Semi-definite programming relaxation + Constraints
     X = cp.Variable((n, n), symmetric=True)
@@ -654,7 +689,7 @@ def Goemans_Williamson(self, MaxCut = None):
     partition = np.sign(x @ u)
 
     # Compute the cut value
-    cut = self.compute_cut(partition)
+    cut = vqa_graph_instance.compute_cut(partition)
 
     # Get the approximation ratio, if 'MaxCut' is given
     if (MaxCut is not None):

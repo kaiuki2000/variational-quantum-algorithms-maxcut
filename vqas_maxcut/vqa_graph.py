@@ -1,6 +1,23 @@
+# This file's imports.
 import networkx as nx
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+
+# Other imports.
+import itertools
+import math
+import time
+
+import pennylane as qml
+from pennylane import numpy as np
+from pennylane.operation import Operation
+
+import matplotlib.pyplot as plt
+import cvxpy as cp
+
+from scipy.linalg import sqrtm
+from scipy import optimize
+
 
 class vqa_graph:
     """
